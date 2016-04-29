@@ -5,25 +5,25 @@ import hashlib
 import json
 import base64
 import os
+import StringIO
 
 from Crypto.Cipher import AES
 
 ''' Global Variables '''
-BLOCK_SIZE = 16
 THIRTY_TWO = 32
 SIXTEEN = 16
 EIGHT = 8
 
-PADDING = lambda s: str(BLOCK_SIZE - len(s) % BLOCK_SIZE)
-
-#add padding according to length
-pad = lambda s: s + (BLOCK_SIZE - len(s) % BLOCK_SIZE) * PADDING(s)
-
-#encode/decode with AES
-EncodeAES = lambda c, s: base64.b64encode(c.encrypt(pad(s)))
-DecodeAES = lambda c, e: c.decrypt(base64.b64decode(e))#.rstrip(PADDING(s))
-
 class Crypt():
+
+	def pad(self, s):
+		result = StringIO.StringIO()
+		m = SIXTEEN - (len(s) % SIXTEEN)
+		print str(m), "pad:", s + str(m)*m
+		return s + str(m)*m
+		# for _ in xrange(m):
+		# 	result.write('%02x' % m)
+		# return s + binascii.unhexlify(result.getvalue())
 
 	def hex_md5(self, string, is_hex):
 		m = hashlib.md5()
@@ -57,18 +57,18 @@ class Crypt():
 		try:
 			with open(path, "rb") as f:
 				magic_number = f.read(4)
-				print "Magic Number:", magic_number.encode('hex')
+				#print "Magic Number:", magic_number.encode('hex')
 
 				salt = f.read(4)
-				print "Salt:", salt
+				#print "Salt:", salt
 
 				IV = f.read(16)
-				print "IV:", IV.encode('hex')
+				#print "IV:", IV.encode('hex')
 
 				master_key = salt+'$'+input_password
 				#print "Master Key:",master_key,",length:", len(master_key)
 				bin_key = self.hex_md5(master_key, False).decode('hex')
-				print "Binary Key:",bin_key, "length:",len(bin_key)
+				#print "Binary Key:",bin_key, "length:",len(bin_key)
 
 				self.set_crypt_params(bin_key, IV)
 
@@ -76,12 +76,12 @@ class Crypt():
 
 				bin_text = f.read(64)
 				#print "Next 64(binary):", bin_text
-				print "Next 64(hex):", bin_text.encode('hex')
+				#print "Next 64(hex):", bin_text.encode('hex')
 
 				bin_text = self.aes_decrypt(bin_text)
-				print "* Decrypted text (bin):", bin_text, "length:", len(bin_text)
+				#print "* Decrypted text (bin):", bin_text, "length:", len(bin_text)
 				hex_text = bin_text.encode('hex')
-				print "* Decrypted text (hex):", hex_text, "length:", len(hex_text)
+				#print "* Decrypted text (hex):", hex_text, "length:", len(hex_text)
 
 				#extract 32 byte random string, MD5 digest and zeros!
 				random_str = hex_text[:64]
@@ -105,11 +105,14 @@ class Crypt():
 							value_length = self.bin_to_int(f.read(4))
 							#print value_length
 							value = f.read(value_length)
-							decrypted_value = self.aes_decrypt(value)#.decode('unicode-escape')
-							if decrypted_value[-2:] == decrypted_value[-4:-2]:
-								decrypted_value = decrypted_value.rstrip(decrypted_value[-2:])
+							decrypted_value = self.aes_decrypt(value)
+
+							if decrypted_value[-1:] == decrypted_value[-2:-1]:
+								decrypted_value = decrypted_value.rstrip(decrypted_value[-1:])
+							elif decrypted_value[-1:] == '\x01':
+								decrypted_value = decrypted_value.rstrip('\x01')
 							print "Value:", decrypted_value, "length:", len(decrypted_value)
-							self.plaintext = self.plaintext + decrypted_value + ", "
+							self.plaintext = self.plaintext + decrypted_value.rstrip('\x00') + ", "
 
 							#TODO
 							f.read(16)
@@ -155,6 +158,23 @@ class Crypt():
 				print encrypted_text, len(encrypted_text)
 				f.write(encrypted_text)
 
+				for key in sorted(contents):
+					json_value = json.dumps(contents[key], separators=(',', ': '))
+					modified_key = key+'\x00'
+					print modified_key,len(modified_key)," || ", json_value , len(json_value)
+
+					f.write(str(len(modified_key)))
+					f.write(modified_key)
+					#add padding
+					padded_val = self.pad(json_value)
+					print "padded_val:", padded_val,"||", len(padded_val)
+					#encrypt value
+					encrypted_val = self.aes_encrypt(padded_val)
+					f.write(str(len(encrypted_val)))
+					f.write(encrypted_val)
+					value_md5 = self.md5(json_value)
+					f.write(value_md5)
+
 		except Exception,e:
 			print str(e)
 		return None
@@ -164,10 +184,10 @@ class Crypt():
 def main():
 	print "*********** This is to test ***********"
 	crypt = Crypt()
-	db = "{\"i am\" : \"reading this\", \"it was\" : \"a fun exercise to find\", \"key\" : \"for\", \"uber.com\" : \"is sekret password\", \"unicode\" : {\"and\": [\"so\", \"is\", \"nested\", \"\"], \"data\": \"is cool: \u2603\"}}"
+	db = "{\"i am\" : \"reading this\", \"it was\" : \"a fun exercise to find\", \"key\" : \"and value for\", \"uber.com\" : \"is sekret password\", \"unicode\" : {\"and\": [\"so\", \"is\", \"nested\", \"\"], \"data\": \"is cool: \u2603\"}}"
 	db_dict = json.loads(db)
 	crypt.write_database("output.db", "uberpass", db_dict)
-	
+
 	crypt.read_database("output.db","uberpass")
 
 	#plaintext = crypt.read_database("../demo.db", "uberpass")
