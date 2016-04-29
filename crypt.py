@@ -50,7 +50,7 @@ class Crypt():
 		return int(binary_string.encode('hex'),16)
 
 	def read_database(self, path, input_password):
-		self.plaintext = ''
+		self.plaintext = "{"
 		try:
 			with open(path, "rb") as f:
 				magic_number = f.read(4)
@@ -97,36 +97,45 @@ class Crypt():
 							key_length = self.bin_to_int(bin_key)
 							#print key_length
 							key = f.read(key_length)
-							print key
+							print "Key:", key
+							self.plaintext = self.plaintext + "\"" + key + "\" : "
 							value_length = self.bin_to_int(f.read(4))
 							#print value_length
 							value = f.read(value_length)
-							#print value
-							decrypted_value = self.aes_decrypt(value).decode('unicode-escape')
+							if value_length==16 :
+								print value
+							decrypted_value = self.aes_decrypt(value)#.decode('unicode-escape')
 							#decryptor.decrypt(value)
-							print "Value:", decrypted_value, "length:", len(decrypted_value)
+							print "Value:", decrypted_value.encode('hex'), "length:", len(decrypted_value)
+							self.plaintext = self.plaintext + decrypted_value + ", "
 
 							#TODO
 							f.read(16)
 						else:
 							print("File Read Complete")
 							break
-			return self.plaintext
+			return self.plaintext.rstrip(", ")+"}"
 
 		except ValueError:
 			print("Value error occurred.")
-			
+			return None
 		except EOFError:
 			print("Reached end of file.")
-			
+			return None
 		except Exception,e:
 			print str(e)
-			
+			return None
 
 
 def main():
 	crypt = Crypt()
-	print "self.plaintext", crypt.read_database("../demo.db", "uberpass")
+	plaintext = crypt.read_database("../demo.db", "uberpass")
+	print "Plaintext:", plaintext
+	#json_text = json.loads(plaintext)
+	other_text = " {\"and\": [\"so\", \"is\", \"nested\", \"data\"], \"is\": \"cool: \u2603\u2744\u2746\"} "
+	print other_text
+	json_text = json.loads (other_text)
+	print json_text["is"]
 
 if __name__ == '__main__':
 	main()
