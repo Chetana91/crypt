@@ -103,7 +103,7 @@ class Crypt():
 							print value_length
 							value = f.read(value_length)
 							#print value
-							decrypted_value = self.aes_decrypt(bin_text)
+							decrypted_value = self.aes_decrypt(value)
 							#decryptor.decrypt(value)
 							print "Decrypted value:", decrypted_value, "length:", len(decrypted_value)
 
