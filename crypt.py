@@ -9,7 +9,6 @@ import os
 from Crypto.Cipher import AES
 
 ''' Global Variables '''
-input_password = "uberpass"
 BLOCK_SIZE = 16
 
 PADDING = lambda s: str(BLOCK_SIZE - len(s) % BLOCK_SIZE)
@@ -96,21 +95,23 @@ class Crypt():
 						bin_key = f.read(4)
 						if len(bin_key)>0:
 							key_length = self.bin_to_int(bin_key)
-							print key_length
+							#print key_length
 							key = f.read(key_length)
-							print key
+							#print key
 							value_length = self.bin_to_int(f.read(4))
-							print value_length
+							#print value_length
 							value = f.read(value_length)
 							#print value
-							decrypted_value = self.aes_decrypt(value)
+							decrypted_value = self.aes_decrypt(value).decode('unicode-escape')
 							#decryptor.decrypt(value)
-							print "Decrypted value:", decrypted_value, "length:", len(decrypted_value)
+							#print "Decrypted value:", decrypted_value, "length:", len(decrypted_value)
 
 							#TODO
 							f.read(16)
 						else:
+							print("File Read Complete")
 							break
+			#return plaintext
 
 		except ValueError:
 			print("Value error occurred.")
@@ -125,7 +126,7 @@ class Crypt():
 
 def main():
 	crypt = Crypt()
-	crypt.read_database("../demo.db", "uberpass")
+	print crypt.read_database("../demo.db", "uberpass")
 
 if __name__ == '__main__':
 	main()
