@@ -10,6 +10,9 @@ from Crypto.Cipher import AES
 
 ''' Global Variables '''
 BLOCK_SIZE = 16
+THIRTY_TWO = 32
+SIXTEEN = 16
+EIGHT = 8
 
 PADDING = lambda s: str(BLOCK_SIZE - len(s) % BLOCK_SIZE)
 
@@ -30,13 +33,21 @@ class Crypt():
 			m.update(string)
 		return m.hexdigest()
 
+	def md5(self, bin_string):
+		m = hashlib.md5()
+		m.update(bin_string)
+		return m.digest()
+
 	def set_crypt_params(self, bin_key, IV):
 		self.master_key = bin_key
 		self.IV = IV
-		self.decryptor = AES.new(self.master_key, AES.MODE_CBC, self.IV)
+		self.cryptor = AES.new(self.master_key, AES.MODE_CBC, self.IV)
 
 	def aes_decrypt(self, bin_text):
-		return self.decryptor.decrypt(bin_text)
+		return self.cryptor.encrypt(bin_text)
+
+	def aes_encrypt(self, bin_text):
+		return self.cryptor.decrypt(bin_text)
 
 	def bin_to_int(self, binary_string):
 		return int(binary_string.encode('hex'),16)
@@ -119,14 +130,31 @@ class Crypt():
 				magic_number = 'badcab00'.decode('hex')
 				f.write(magic_number)
 				#writing salt characters
-				salt = "wYl0".decode('ascii')
+				salt = 'wYl0'.decode('ascii')
 				f.write(salt)
 
-			with open(path, "rb") as f:
-				magic_number = f.read(4)
-				print "Magic Number:", magic_number, len(magic_number)#.encode('hex')
-				salt = f.read(4)
-				print "Salt:", salt
+				#generate IV
+				IV = os.urandom(SIXTEEN)
+				f.write(IV)
+
+				master_key = salt+'$'+input_password
+
+				print "Master Key:", master_key
+				bin_key = self.hex_md5(master_key, False).decode('hex')
+
+				self.set_crypt_params(bin_key, IV)
+
+				# generate a random secret
+				secret = os.urandom(THIRTY_TWO)
+				secret_md5 = self.md5(secret)
+				zeros = ('0'*EIGHT).encode('hex')
+				big_secret = secret+secret_md5+zeros
+				print "Big Secret:", big_secret, len(big_secret), len(secret), len(secret_md5), len(zeros)
+
+				encrypted_text = self.aes_encrypt(big_secret)
+				print encrypted_text, len(encrypted_text)
+				f.write(encrypted_text)
+
 		except Exception,e:
 			print str(e)
 		return None
@@ -134,16 +162,23 @@ class Crypt():
 
 
 def main():
+	print "*********** This is to test ***********"
 	crypt = Crypt()
-	plaintext = crypt.read_database("../demo.db", "uberpass")
-	print "Plaintext:", plaintext
-	json_text = json.loads(plaintext)
+	db = "{\"i am\" : \"reading this\", \"it was\" : \"a fun exercise to find\", \"key\" : \"for\", \"uber.com\" : \"is sekret password\", \"unicode\" : {\"and\": [\"so\", \"is\", \"nested\", \"\"], \"data\": \"is cool: \u2603\"}}"
+	db_dict = json.loads(db)
+	crypt.write_database("output.db", "uberpass", db_dict)
+	
+	crypt.read_database("output.db","uberpass")
+
+	#plaintext = crypt.read_database("../demo.db", "uberpass")
+	#print "Plaintext:", plaintext
+	#json_text = json.loads(plaintext)
 	#other_text = " {\"and\": [\"so\", \"is\", \"nested\", \"data\"], \"is\": \"cool: \u2603\u2744\u2746\"} "
 	#print other_text
 	#json_text = json.loads (other_text)
-	print json_text["is"]
+	#print json_text["is"]
 
-	crypt.write_database("output.db", "uberpass", None)
+	
 
 if __name__ == '__main__':
 	main()
