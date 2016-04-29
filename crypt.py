@@ -20,14 +20,6 @@ pad = lambda s: s + (BLOCK_SIZE - len(s) % BLOCK_SIZE) * PADDING(s)
 EncodeAES = lambda c, s: base64.b64encode(c.encrypt(pad(s)))
 DecodeAES = lambda c, e: c.decrypt(base64.b64decode(e))#.rstrip(PADDING(s))
 
-# file decryption - demo.db
-
-# def hexify(binary_string):
-# 	return hex(int(binascii.hexlify(binary_string), 16)).rstrip("L").lstrip("0x")
-
-#def unhexify(hex_string):
-#	return binascii.unhexlify(hex_string)
-
 class Crypt():
 
 	def hex_md5(self, string, is_hex):
@@ -102,11 +94,10 @@ class Crypt():
 							value_length = self.bin_to_int(f.read(4))
 							#print value_length
 							value = f.read(value_length)
-							if value_length==16 :
-								print value
 							decrypted_value = self.aes_decrypt(value)#.decode('unicode-escape')
-							#decryptor.decrypt(value)
-							print "Value:", decrypted_value.encode('hex'), "length:", len(decrypted_value)
+							if decrypted_value[-2:] == decrypted_value[-4:-2]:
+								decrypted_value = decrypted_value.rstrip(decrypted_value[-2:])
+							print "Value:", decrypted_value, "length:", len(decrypted_value)
 							self.plaintext = self.plaintext + decrypted_value + ", "
 
 							#TODO
@@ -115,27 +106,44 @@ class Crypt():
 							print("File Read Complete")
 							break
 			return self.plaintext.rstrip(", ")+"}"
-
-		except ValueError:
-			print("Value error occurred.")
-			return None
-		except EOFError:
-			print("Reached end of file.")
-			return None
 		except Exception,e:
 			print str(e)
-			return None
+		return None
+
+
+	#(unicode_text path, unicode_text password, dict contents) -> void
+	def write_database(self, path, input_password, contents):
+		try:
+			with open(path, "wb") as f:
+				#writing the default magic number to file
+				magic_number = 'badcab00'.decode('hex')
+				f.write(magic_number)
+				#writing salt characters
+				salt = "wYl0".decode('ascii')
+				f.write(salt)
+
+			with open(path, "rb") as f:
+				magic_number = f.read(4)
+				print "Magic Number:", magic_number, len(magic_number)#.encode('hex')
+				salt = f.read(4)
+				print "Salt:", salt
+		except Exception,e:
+			print str(e)
+		return None
+		
 
 
 def main():
 	crypt = Crypt()
 	plaintext = crypt.read_database("../demo.db", "uberpass")
 	print "Plaintext:", plaintext
-	#json_text = json.loads(plaintext)
-	other_text = " {\"and\": [\"so\", \"is\", \"nested\", \"data\"], \"is\": \"cool: \u2603\u2744\u2746\"} "
-	print other_text
-	json_text = json.loads (other_text)
+	json_text = json.loads(plaintext)
+	#other_text = " {\"and\": [\"so\", \"is\", \"nested\", \"data\"], \"is\": \"cool: \u2603\u2744\u2746\"} "
+	#print other_text
+	#json_text = json.loads (other_text)
 	print json_text["is"]
+
+	crypt.write_database("output.db", "uberpass", None)
 
 if __name__ == '__main__':
 	main()
