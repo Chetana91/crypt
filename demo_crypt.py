@@ -28,7 +28,7 @@ class DemoCrypt():
 
 	def bin_to_int(self, binary_string):
 		return int(binary_string.encode('hex'),16)
-
+		
 	def read_demo_file(self, path, input_password):
 		self.plaintext = "{"
 		try:
@@ -73,23 +73,30 @@ class DemoCrypt():
 					#reading next lines
 					while True:
 						bin_key = f.read(4)
+						print "bin_key:", bin_key
 						if len(bin_key)>0:
 							key_length = self.bin_to_int(bin_key)
-							#print key_length
+							print "key_length", key_length
 							key = f.read(key_length)
 							print "Key:", key
-							self.plaintext = self.plaintext + "\"" + key + "\" : "
+							self.plaintext = self.plaintext + "\"" + key.rstrip('\x00').decode('unicode-escape') + "\" : "
 							value_length = self.bin_to_int(f.read(4))
 							#print value_length
 							value = f.read(value_length)
-							decrypted_value = self.aes_decrypt(value).rstrip('\00\0\1')#.decode('unicode-escape')
-							if decrypted_value[-2:] == decrypted_value[-4:-2]:
-								decrypted_value = decrypted_value.rstrip(decrypted_value[-2:])
-							print "Value:", repr(decrypted_value), "length:", len(decrypted_value)
-							self.plaintext = self.plaintext + decrypted_value + ", "
+							decrypted_value = self.aes_decrypt(value).rstrip('\00\0\1')
 
-							#TODO
-							f.read(16)
+
+							if decrypted_value[-1:] == decrypted_value[-2:-1]:
+								decrypted_value = decrypted_value.rstrip(decrypted_value[-1:])
+							elif decrypted_value[-1:] == '\x01':
+								decrypted_value = decrypted_value.rstrip('\x01')
+							print "Value:", decrypted_value, "length:", len(decrypted_value)
+							self.plaintext = self.plaintext + decrypted_value.rstrip('\x00').decode('unicode-escape') + ", "
+
+							md5 = f.read(16)
+							val_md5 = self.hex_md5(decrypted_value, False)
+							if md5 == val_md5:
+								print "MD5 Matched"
 						else:
 							print("File Read Complete")
 							break
@@ -103,8 +110,7 @@ def main():
 	demo_crypt = DemoCrypt()
 	plaintext = demo_crypt.read_demo_file("../demo.db", "uberpass")
 	print "Plaintext:", plaintext
-	#json_text = json.loads(plaintext)
-	#print json_text["uber.com"]
-
+	json_text = json.loads(plaintext, strict=False)
+	print json_text[u"uber.com"]
 if __name__ == '__main__':
 	main()
